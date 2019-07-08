@@ -11,6 +11,7 @@ use Lcobucci\JWT\Token;
 use League\OAuth2\Client\Provider\GenericProvider;
 use InvalidArgumentException;
 use OpenIDConnectClient\Exception\InvalidTokenException;
+use OpenIDConnectClient\Validator\ArrayEqualsTo;
 use OpenIDConnectClient\Validator\EqualsTo;
 use OpenIDConnectClient\Validator\GreaterOrEqualsTo;
 use OpenIDConnectClient\Validator\LesserOrEqualsTo;
@@ -24,6 +25,9 @@ class OpenIDConnectProvider extends GenericProvider
      * @var string
      */
     protected $publicKey;
+    
+    /** @var bool */
+    protected $verifyPublicKey;
 
     /**
      * @var Signer
@@ -57,14 +61,19 @@ class OpenIDConnectProvider extends GenericProvider
             new NotEmpty('iat', true),
             new GreaterOrEqualsTo('exp', true),
             new EqualsTo('iss', true),
-            new EqualsTo('aud', true),
+            new ArrayEqualsTo('aud', true),
             new NotEmpty('sub', true),
             new LesserOrEqualsTo('nbf'),
             new EqualsTo('jti'),
             new EqualsTo('azp'),
             new EqualsTo('nonce'),
         ]);
-
+	
+	    $this->verifyPublicKey = true;
+	    if (true === isset($options['verifyPublicKey']) && is_bool($options['verifyPublicKey'])) {
+		    $this->verifyPublicKey = $options['verifyPublicKey'];
+	    }
+        
         if (empty($options['scopes'])) {
             $options['scopes'] = [];
         } else if (!is_array($options['scopes'])) {
@@ -86,7 +95,9 @@ class OpenIDConnectProvider extends GenericProvider
     protected function getRequiredOptions()
     {
         $options = parent::getRequiredOptions();
-        $options[] = 'publicKey';
+        if (true === $this->verifyPublicKey) {
+	        $options[] = 'publicKey';
+        }
         $options[] = 'idTokenIssuer';
 
         return $options;
@@ -123,7 +134,7 @@ class OpenIDConnectProvider extends GenericProvider
         //
         // The alg value SHOULD be the default of RS256 or the algorithm sent by the Client in the
         // id_token_signed_response_alg parameter during Registration.
-        if (false === $token->verify($this->signer, $this->getPublicKey())) {
+        if (true === $this->verifyPublicKey && false === $token->verify($this->signer, $this->getPublicKey())) {
             throw new InvalidTokenException('Received an invalid id_token from authorization server.');
         }
 
